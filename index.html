@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energy Consumption Calculator</title>
+  <!-- Include jsPDF and jsPDF-AutoTable libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    /* Attractive gradient background from deep orange to bright yellow */
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      background: linear-gradient(135deg, #F7971E, #FFD200); 
+      color: white; 
+      margin: 0;
+      padding: 0;
+    }
+    .container { 
+      max-width: 800px; 
+      margin: auto; 
+      padding: 20px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 20px; 
+    }
+    .top-section { 
+      display: flex; 
+      gap: 20px; 
+      justify-content: space-between; 
+      flex-wrap: wrap;
+    }
+    .left-section, .right-section { 
+      flex: 1 1 300px; /* allows flexibility with minimum width */
+      padding: 20px; 
+      border-radius: 10px; 
+      background: rgba(255, 255, 255, 0.1); 
+      box-sizing: border-box;
+    }
+    .bottom-section { 
+      padding: 20px; 
+      border-radius: 10px; 
+      background: rgba(255, 255, 255, 0.1); 
+      margin-top: 20px; 
+    }
+    input { 
+      width: 100%; 
+      padding: 8px; 
+      margin: 5px 0; 
+      border-radius: 5px; 
+      border: none; 
+      box-sizing: border-box;
+    }
+    button { 
+      background-color: green; 
+      color: white; 
+      padding: 10px; 
+      border: none; 
+      width: 100%; 
+      margin-top: 10px; 
+      border-radius: 5px; 
+      cursor: pointer; 
+      box-sizing: border-box;
+    }
+    table { 
+      width: 100%; 
+      margin-top: 10px; 
+      border-collapse: collapse; 
+      background: rgba(255, 255, 255, 0.2); 
+    }
+    th, td { 
+      padding: 8px; 
+      text-align: left; 
+      color: white; 
+    }
+    .remove-btn { 
+      background-color: red; 
+      color: white; 
+      border: none; 
+      padding: 5px; 
+      cursor: pointer; 
+      border-radius: 5px; 
+    }
+    .result-container { 
+      margin-top: 15px; 
+      padding: 10px; 
+      border-radius: 10px; 
+      background: rgba(255, 255, 255, 0.2); 
+      font-size: 1.2em; 
+    }
+    /* Change text color for usage breakdown table for better contrast */
+    .result-container table, 
+    .result-container th, 
+    .result-container td {
+      color: #333;
+    }
+    .result-box { 
+      display: inline-block; 
+      padding: 5px 10px; 
+      background: yellow; 
+      color: black; 
+      border-radius: 5px; 
+      margin: 0 5px; 
+      font-weight: bold; 
+    }
+    /* Media Queries for smaller devices */
+    @media only screen and (max-width: 768px) {
+      .top-section {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>⚡ Energy Consumption Tracker ⚡</h2>
+    <p>Add your appliances and see how much energy you consume!</p>
+    
+    <div class="top-section">
+      <div class="left-section">
+        <h3>Add Appliance</h3>
+        <input type="text" id="appliance" placeholder="Appliance Name">
+        <input type="number" id="wattage" placeholder="Power Consumption (Watts)">
+        <input type="number" id="hours" placeholder="Hours Per Day">
+        <button onclick="addAppliance()">➕ Add Appliance</button>
+      </div>
+      
+      <div class="right-section">
+        <h3>Appliances List</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Appliance</th>
+              <th>Wattage (W)</th>
+              <th>Hours/Day</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="applianceList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bottom-section">
+      <input type="number" id="cost" placeholder="Electricity Cost (per kWh in ₹)">
+      <button onclick="calculateTotal()">⚡ Calculate</button>
+      <button onclick="downloadResult()">📥 Download</button>
+      <button onclick="clearResults()">🗑 Clear</button>
+    </div>
+    
+    <div class="result-container">
+      <h3>Usage Breakdown</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Appliance</th>
+            <th>Daily Usage (kWh)</th>
+            <th>Monthly Usage (kWh)</th>
+            <th>Per Day Cost (Rs.)</th>
+            <th>Per Month Cost (Rs.)</th>
+          </tr>
+        </thead>
+        <tbody id="usageBreakdown"></tbody>
+      </table>
+      <h3>Total Consumption</h3>
+      <span class="result-box">🔥 <span id="dailyConsumption">0</span> kWh/day</span>
+      <span class="result-box">📆 <span id="monthlyConsumption">0</span> kWh/month</span>
+      <span class="result-box">💰 ₹<span id="estimatedCost">0</span></span>
+    </div>
+  </div>
+
+  <script>
+    let appliances = [];
+
+    function addAppliance() {
+      let name = document.getElementById("appliance").value;
+      let wattage = document.getElementById("wattage").value;
+      let hours = document.getElementById("hours").value;
+
+      if (name && wattage && hours) {
+        appliances.push({ name, wattage: Number(wattage), hours: Number(hours) });
+        updateTable();
+        document.getElementById("appliance").value = "";
+        document.getElementById("wattage").value = "";
+        document.getElementById("hours").value = "";
+      } else {
+        alert("Please fill all fields!");
+      }
+    }
+
+    function updateTable() {
+      let tableBody = document.getElementById("applianceList");
+      tableBody.innerHTML = "";
+      appliances.forEach((app, index) => {
+        let row = `<tr>
+          <td>${app.name}</td>
+          <td>${app.wattage}</td>
+          <td>${app.hours}</td>
+          <td><button class='remove-btn' onclick='removeAppliance(${index})'>Remove</button></td>
+        </tr>`;
+        tableBody.innerHTML += row;
+      });
+    }
+
+    function removeAppliance(index) {
+      appliances.splice(index, 1);
+      updateTable();
+    }
+
+    function calculateTotal() {
+      let usageBody = document.getElementById("usageBreakdown");
+      usageBody.innerHTML = "";
+      let totalPerDay = 0;
+      let totalPerMonth = 0;
+      let totalPerDayCost = 0;
+      let totalPerMonthCost = 0;
+      let costPerKwh = document.getElementById("cost").value;
+
+      appliances.forEach(app => {
+        let dailyUsage = (app.wattage * app.hours) / 1000;
+        let monthlyUsage = dailyUsage * 30;
+        let perDayCost = dailyUsage * costPerKwh;
+        let perMonthCost = monthlyUsage * costPerKwh;
+        totalPerDay += dailyUsage;
+        totalPerMonth += monthlyUsage;
+        totalPerDayCost += perDayCost;
+        totalPerMonthCost += perMonthCost;
+
+        let row = `<tr>
+          <td>${app.name}</td>
+          <td>${dailyUsage.toFixed(2)}</td>
+          <td>${monthlyUsage.toFixed(2)}</td>
+          <td>Rs.${perDayCost.toFixed(2)}</td>
+          <td>Rs.${perMonthCost.toFixed(2)}</td>
+        </tr>`;
+        usageBody.innerHTML += row;
+      });
+
+      document.getElementById("dailyConsumption").textContent = totalPerDay.toFixed(2);
+      document.getElementById("monthlyConsumption").textContent = totalPerMonth.toFixed(2);
+      document.getElementById("estimatedCost").textContent = totalPerMonthCost.toFixed(2);
+    }
+
+    function downloadResult() {
+      const { jsPDF } = window.jspdf;
+      let doc = new jsPDF();
+
+      let costPerKwh = document.getElementById("cost").value;
+      if (!costPerKwh) {
+        alert("Please enter the electricity cost (per kWh) before downloading the report.");
+        return;
+      }
+
+      let columns = ["Appliance", "Daily Usage (kWh)", "Monthly Usage (kWh)", "Per Day Cost (Rs.)", "Per Month Cost (Rs.)"];
+      let rows = [];
+
+      let totalPerDay = 0;
+      let totalPerMonth = 0;
+      let totalPerDayCost = 0;
+      let totalPerMonthCost = 0;
+
+      appliances.forEach(app => {
+        let dailyUsage = (app.wattage * app.hours) / 1000;
+        let monthlyUsage = dailyUsage * 30;
+        let perDayCost = dailyUsage * costPerKwh;
+        let perMonthCost = monthlyUsage * costPerKwh;
+        totalPerDay += dailyUsage;
+        totalPerMonth += monthlyUsage;
+        totalPerDayCost += perDayCost;
+        totalPerMonthCost += perMonthCost;
+        
+        rows.push([
+          app.name,
+          dailyUsage.toFixed(2),
+          monthlyUsage.toFixed(2),
+          "Rs." + perDayCost.toFixed(2),
+          "Rs." + perMonthCost.toFixed(2)
+        ]);
+      });
+
+      rows.push([
+        "Total",
+        totalPerDay.toFixed(2),
+        totalPerMonth.toFixed(2),
+        "Rs." + totalPerDayCost.toFixed(2),
+        "Rs." + totalPerMonthCost.toFixed(2)
+      ]);
+
+      doc.text("Energy Consumption Report", 14, 15);
+      doc.autoTable({
+        head: [columns],
+        body: rows,
+        startY: 20,
+        styles: { halign: 'center' }
+      });
+      doc.save("energy_report.pdf");
+    }
+
+    function clearResults() {
+      document.getElementById("cost").value = "";
+      document.getElementById("dailyConsumption").textContent = "0";
+      document.getElementById("monthlyConsumption").textContent = "0";
+      document.getElementById("estimatedCost").textContent = "0";
+      document.getElementById("usageBreakdown").innerHTML = "";
+      document.getElementById("applianceList").innerHTML = "";
+      appliances = [];
+    }
+  </script>
+</body>
+</html>
